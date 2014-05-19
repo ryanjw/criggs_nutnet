@@ -97,21 +97,59 @@ nut_model_ver2<-"model{
 
 }"
 
-Nrow<-nrow(dataset.sub)
+
+nut_model_ver3<-"model{
+	
+	for(i in 1:Ndata){
+	y[i]~dnorm(mu[i],tau.e)
+	mu[i]<-alpha+beta*x[i]+theta_block[block[i]]+theta_site[site[i]]+theta_region[region[i]]
+	}
+	#three random effects for spatial scale (block,site,region)
+	for(j in 1:Nblock){theta_block[j]~dnorm(0, tau_block)}
+	for(k in 1:Nsite){theta_site[k]~dnorm(0, tau_site)}
+	for(l in 1:Nregion){theta_region[l]~dnorm(0, tau_region)}
+	
+	#establishing flat priors for everything
+	tau.e~dgamma(0.0001,0.0001)
+	sigma2.e<-1/tau.e
+	tau_block~dgamma(0.0001,0.0001)
+	sigma2_block<-1/tau_block
+	tau_site~dgamma(0.0001,0.0001)
+	sigma2_site<-1/tau_site
+	tau_region~dgamma(0.0001,0.0001)
+	sigma2_region<-1/tau_region
+
+	#intercept
+	alpha~dnorm(0,0.0001)
+	beta~dnorm(0,0.0001)
+	#variance explained at each scale
+	VPS_block<-sigma2_block/(sigma2.e+sigma2_block+sigma2_site+sigma2_region)
+	VPS_site<-sigma2_site/(sigma2.e+sigma2_block+sigma2_site+sigma2_region)
+	VPS_region<-sigma2_region/(sigma2.e+sigma2_block+sigma2_site+sigma2_region)
+	
+
+}"
+
+#establishing factors for random effects
 block<-as.integer(factor(dataset.sub[,"block"]))
-Nblock<-length(unique(block))
 site<-as.integer(factor(dataset.sub[,"site_code"]))
-Nsite<-(length(unique(site)))
-block
 region<-as.integer(factor(dataset.sub[,"region"]))
+
+#Nvariables for counting
+
+Ndata<-nrow(dataset.sub)
+Nblock<-length(unique(block))
+Nsite<-(length(unique(site)))
 Nregion<-length(unique(region))
 
+#variables for the model
 x = as.numeric((dataset.sub[,"plot"]))
 y = (dataset.sub[,"soil_pctC"])
 zx=(x-mean(x))
 zy=(y-mean(y))
-
-model.part2=jags.model(textConnection(nut_model_ver2), data=list("Ndata"=Nrow,"block"=block,"region"=region,"site"=site,"y"=zy),n.chains=3)
+model_ver3=jags.model(textConnection(nut_model_ver3),
+ data=list("Ndata"=Ndata,"Nblock"=Nblock,"Nsite"=Nsite,"Nregion"=Nregion, "block"=block,"site"=site, "region"=region,"y"=zy,"x"=zx  ),
+ n.chains=3)
 
 chains=coda.samples(model=model.part2, c("beta"),n.iter=100000,thin=200)
 summary(chains)
